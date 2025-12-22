@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      Role
+  schoolId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school    School?  @relation("SchoolUsers", fields: [schoolId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String
+  actorId    String
+  actorRole  String
+  actorEmail String
+  entity     String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model School {
+  id              String   @id @default(uuid())
+  name            String
+  code            String   @unique
+  isChainedSchool Boolean  @default(false)
+  address         String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  district        String?
+  pincode         String?
+  studentCount    Int?
+  users           User[]   @relation("SchoolUsers")
+}
+
+enum Role {
+  SUPERADMIN
+  SCHOOL_ADMIN
+  TEACHER
+}
