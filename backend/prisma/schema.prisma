@@ -7,6 +7,10 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+// ==========================================
+// CORE MODELS
+// ==========================================
+
 model User {
   id        String   @id @default(uuid())
   name      String
@@ -15,9 +19,12 @@ model User {
   password  String
   role      Role
   schoolId  String?
+  tutorId   String?  @unique // Links to Tutor for TEACHER role
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  school    School?  @relation("SchoolUsers", fields: [schoolId], references: [id])
+  
+  school    School?  @relation("SchoolUsers", fields: [schoolId], references: [id], onDelete: Cascade)
+  tutor     Tutor?   @relation(fields: [tutorId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
@@ -44,11 +51,98 @@ model School {
   district        String?
   pincode         String?
   studentCount    Int?
-  users           User[]   @relation("SchoolUsers")
+  
+  users   User[]   @relation("SchoolUsers")
+  grades  Grade[]
+  tutors  Tutor[]
 }
 
 enum Role {
   SUPERADMIN
   SCHOOL_ADMIN
   TEACHER
+}
+
+// ==========================================
+// ACADEMIC STRUCTURE
+// ==========================================
+
+model Grade {
+  id        String   @id @default(uuid())
+  name      String
+  schoolId  String
+  order     Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sections  Section[]
+  
+  @@unique([schoolId, name])
+}
+
+model Section {
+  id           String   @id @default(uuid())
+  name         String
+  gradeId      String
+  classTutorId String?  // ONE class tutor per section (can view all class details)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  grade      Grade            @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  classTutor Tutor?           @relation("ClassTutor", fields: [classTutorId], references: [id], onDelete: SetNull)
+  subjects   SectionSubject[]
+  
+  @@unique([gradeId, name])
+}
+
+model SectionSubject {
+  id        String   @id @default(uuid())
+  name      String
+  sectionId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  section          Section                  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  tutorAssignments TutorSubjectAssignment[] // Multiple tutors can teach this subject
+  
+  @@unique([sectionId, name])
+}
+
+// ==========================================
+// TUTOR & ASSIGNMENTS
+// ==========================================
+
+model Tutor {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  schoolId  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  school             School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classSections      Section[]                @relation("ClassTutor") // Sections where this tutor is class tutor
+  subjectAssignments TutorSubjectAssignment[] // Subjects this tutor teaches
+  user               User?                    // Linked User account for login
+}
+
+// Multiple tutors can be assigned to teach subjects
+model TutorSubjectAssignment {
+  id               String   @id @default(uuid())
+  tutorId          String
+  sectionSubjectId String
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  tutor          Tutor          @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  sectionSubject SectionSubject @relation(fields: [sectionSubjectId], references: [id], onDelete: Cascade)
+  
+  @@unique([tutorId, sectionSubjectId])
 }

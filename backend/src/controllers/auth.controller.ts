@@ -1,11 +1,8 @@
 import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../config/database";
-import {generateAccessToken,generateRefreshToken,} from "../utils/jwt.util";
+import { generateAccessToken, generateRefreshToken } from "../utils/jwt.util";
 
-/**
- * LOGIN
- */
 export const login = async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
@@ -29,21 +26,12 @@ export const login = async (req: Request, res: Response) => {
   const refreshToken = generateRefreshToken(user.id);
 
   res.json({
-    user: {
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      schoolId: user.schoolId,
-    },
+    user: { id: user.id, name: user.name, role: user.role, schoolId: user.schoolId },
     accessToken,
     refreshToken,
   });
 };
 
-/**
- * AUTH ME
- * (uses req.user set by authenticate middleware)
- */
 export const me = async (req: Request, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ message: "Unauthorized" });
