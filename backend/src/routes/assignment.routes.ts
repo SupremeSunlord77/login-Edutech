@@ -8,118 +8,105 @@ import {
   deleteAllTutorAssignments,
   assignClassTutor,
   removeClassTutor,
-  listTutorAssignments,
+  assignSubjectToTutor,
   listSectionAssignments,
   removeAssignment,
+  checkDuplicateAssignment,
 } from "../controllers/assignment.controller";
 
 const router = Router({ mergeParams: true });
 
 router.use(authenticate);
 
-/* ================= SMART ASSIGN (Primary Endpoint) ================= */
+/* ================= TUTOR ASSIGNMENTS ================= */
 
 /**
- * SMART ASSIGN TUTOR
- * POST /api/v1/schools/:schoolId/assignments/tutor-assignments
+ * SMART ASSIGN TUTOR (Frontend-Compatible)
+ * POST /api/v1/schools/:schoolId/assignments
+ * 
+ * Assigns subjects and/or class tutor role to a tutor
+ * Now properly prevents duplicate assignments
  * 
  * Body: {
  *   tutorId: string,
- *   assignments: { "Grade 1-A": ["English", "Maths"], ... },
+ *   assignments: {
+ *     "Grade 1-A": ["English", "Maths"],
+ *     "Grade 1-B": ["Science"],
+ *   },
  *   classGrade?: string,
  *   classSection?: string
  * }
+ * 
+ * Response includes:
+ * - subjectAssignments: successfully created
+ * - skippedAssignments: already existed (with reason)
+ * - errors: any issues encountered
  */
 router.post(
-  "/tutor-assignments",
+  "/",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   smartAssignTutor
 );
 
 /**
  * LIST ALL ASSIGNMENTS GROUPED BY TUTOR
- * GET /api/v1/schools/:schoolId/assignments/tutor-assignments
- * 
- * Returns: [{
- *   id, tutorId, tutorName,
- *   assignments: { "Grade 1-A": ["English"] },
- *   classGrade, classSection
- * }]
+ * GET /api/v1/schools/:schoolId/assignments
  */
 router.get(
-  "/tutor-assignments",
-  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  "/",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN", "TEACHER"),
   listAssignmentsGrouped
 );
 
 /**
  * UPDATE TUTOR ASSIGNMENTS (Replace All)
- * PUT /api/v1/schools/:schoolId/assignments/tutor-assignments
+ * PUT /api/v1/schools/:schoolId/assignments
  * 
- * Body: Same as smart assign
+ * Removes all existing assignments and creates new ones
+ * 
+ * Body: same as POST /assignments
  */
 router.put(
-  "/tutor-assignments",
+  "/",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   updateTutorAssignments
 );
 
-/* ================= TUTOR-SPECIFIC ROUTES ================= */
-
 /**
- * LIST ASSIGNMENTS FOR SPECIFIC TUTOR
- * GET /api/v1/schools/:schoolId/assignments/tutors/:tutorId
+ * CHECK FOR DUPLICATE ASSIGNMENT
+ * GET /api/v1/schools/:schoolId/assignments/check-duplicate
+ * 
+ * Query params: tutorId, sectionSubjectId
+ * 
+ * Returns: { isDuplicate: boolean, message?: string, existingAssignment?: object }
  */
 router.get(
-  "/tutors/:tutorId",
-  requireRole("SUPERADMIN", "SCHOOL_ADMIN", "TEACHER"),
-  listTutorAssignments
+  "/check-duplicate",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  checkDuplicateAssignment
+);
+
+/**
+ * ASSIGN SINGLE SUBJECT TO TUTOR
+ * POST /api/v1/schools/:schoolId/assignments/subject
+ * 
+ * Body: { tutorId: string, sectionSubjectId: string }
+ */
+router.post(
+  "/subject",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  assignSubjectToTutor
 );
 
 /**
  * DELETE ALL ASSIGNMENTS FOR TUTOR
- * DELETE /api/v1/schools/:schoolId/assignments/tutors/:tutorId
+ * DELETE /api/v1/schools/:schoolId/assignments/tutor/:tutorId
  */
 router.delete(
-  "/tutors/:tutorId",
+  "/tutor/:tutorId",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   deleteAllTutorAssignments
 );
-
-/* ================= SECTION ROUTES ================= */
-
-/**
- * LIST ASSIGNMENTS FOR SECTION
- * GET /api/v1/schools/:schoolId/assignments/sections/:sectionId
- */
-router.get(
-  "/sections/:sectionId",
-  requireRole("SUPERADMIN", "SCHOOL_ADMIN", "TEACHER"),
-  listSectionAssignments
-);
-
-/**
- * ASSIGN CLASS TUTOR TO SECTION
- * POST /api/v1/schools/:schoolId/assignments/sections/:sectionId/class-tutor
- * Body: { tutorId: string }
- */
-router.post(
-  "/sections/:sectionId/class-tutor",
-  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
-  assignClassTutor
-);
-
-/**
- * REMOVE CLASS TUTOR FROM SECTION
- * DELETE /api/v1/schools/:schoolId/assignments/sections/:sectionId/class-tutor
- */
-router.delete(
-  "/sections/:sectionId/class-tutor",
-  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
-  removeClassTutor
-);
-
-/* ================= SINGLE ASSIGNMENT ================= */
 
 /**
  * REMOVE SINGLE ASSIGNMENT
@@ -129,6 +116,40 @@ router.delete(
   "/:assignmentId",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   removeAssignment
+);
+
+/* ================= CLASS TUTOR ================= */
+
+/**
+ * ASSIGN CLASS TUTOR
+ * POST /api/v1/schools/:schoolId/assignments/sections/:sectionId/class-tutor
+ * 
+ * Body: { tutorId: string }
+ */
+router.post(
+  "/sections/:sectionId/class-tutor",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  assignClassTutor
+);
+
+/**
+ * REMOVE CLASS TUTOR
+ * DELETE /api/v1/schools/:schoolId/assignments/sections/:sectionId/class-tutor
+ */
+router.delete(
+  "/sections/:sectionId/class-tutor",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  removeClassTutor
+);
+
+/**
+ * LIST SECTION ASSIGNMENTS
+ * GET /api/v1/schools/:schoolId/assignments/sections/:sectionId
+ */
+router.get(
+  "/sections/:sectionId",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN", "TEACHER"),
+  listSectionAssignments
 );
 
 export default router;

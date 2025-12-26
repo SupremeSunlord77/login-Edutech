@@ -23,7 +23,7 @@ router.use(authenticate);
  * - subjects: Array of unique subject names
  */
 router.get(
-  "/dashboard",
+  "/:schoolId/dashboard",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   getDashboardSummary
 );
@@ -35,7 +35,7 @@ router.get(
  * Returns simplified school info for header display
  */
 router.get(
-  "/header",
+  "/:schoolId/header",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   getSchoolHeader
 );
@@ -47,7 +47,7 @@ router.get(
  * Returns detailed statistics
  */
 router.get(
-  "/stats",
+  "/:schoolId/stats",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   getSchoolStats
 );

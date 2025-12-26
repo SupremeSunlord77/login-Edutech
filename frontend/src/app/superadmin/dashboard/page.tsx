@@ -116,6 +116,11 @@ export default function SuperAdminDashboard() {
   const filteredSchools = schools.filter((s) =>
     (s.name || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  /* ================= VIEW SCHOOL ================= */
+  const handleViewSchool = (school: School) => {
+    router.push(`/superadmin/school/${school.id}`);
+  };
   
   /* ================= CREATE / UPDATE ================= */
   const submitSchool = async () => {
@@ -196,6 +201,25 @@ export default function SuperAdminDashboard() {
   return (
     <div className="min-h-screen bg-[#f9fafb] text-[#1f2937] font-sans">
 
+      {/* TOAST NOTIFICATIONS */}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg animate-in slide-in-from-right duration-300 ${
+              toast.type === "success" ? "bg-green-50 border border-green-200 text-green-800" :
+              toast.type === "error" ? "bg-red-50 border border-red-200 text-red-800" :
+              "bg-blue-50 border border-blue-200 text-blue-800"
+            }`}
+          >
+            <span className="text-sm">{toast.message}</span>
+            <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600">
+              &times;
+            </button>
+          </div>
+        ))}
+      </div>
+
       {/* MAIN CONTENT */}
       <main className="max-w-[1400px] mx-auto px-8 py-10">
         
@@ -272,14 +296,35 @@ export default function SuperAdminDashboard() {
               >
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-lg text-[#1f2937] pr-4">{s.name}</h3>
-                  <div className="flex gap-2 shrink-0">
-                      <button onClick={() => openEdit(s)} className="p-1.5 text-gray-400 hover:text-[#0f1419] bg-transparent hover:bg-gray-50 rounded transition-colors">
+                  <div className="flex gap-1 shrink-0">
+                      {/* VIEW BUTTON */}
+                      <button 
+                        onClick={() => handleViewSchool(s)} 
+                        className="p-1.5 text-gray-400 hover:text-blue-600 bg-transparent hover:bg-blue-50 rounded transition-colors"
+                        title="View School"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      </button>
+                      {/* EDIT BUTTON */}
+                      <button 
+                        onClick={() => openEdit(s)} 
+                        className="p-1.5 text-gray-400 hover:text-[#0f1419] bg-transparent hover:bg-gray-50 rounded transition-colors"
+                        title="Edit School"
+                      >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path key="edit-p1" d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                           <path key="edit-p2" d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                       </button>
-                      <button onClick={() => { setSelectedSchool(s); setShowDelete(true); }} className="p-1.5 text-gray-400 hover:text-red-600 bg-transparent hover:bg-red-50 rounded transition-colors">
+                      {/* DELETE BUTTON */}
+                      <button 
+                        onClick={() => { setSelectedSchool(s); setShowDelete(true); }} 
+                        className="p-1.5 text-gray-400 hover:text-red-600 bg-transparent hover:bg-red-50 rounded transition-colors"
+                        title="Delete School"
+                      >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline key="del-poly" points="3 6 5 6 21 6"></polyline>
                           <path key="del-path" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -288,11 +333,11 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
                     <span className="text-red-500">📍</span> {s.district || "Unknown District"}
                 </div>
 
-                <div className="flex justify-between items-center pt-2">
+                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2 text-sm text-[#1f2937] font-medium">
                     <span className="text-purple-600">👥</span> {s.studentCount ?? 0} Students
                   </div>
@@ -317,19 +362,48 @@ export default function SuperAdminDashboard() {
                     {s.district || "No District"} • {s.studentCount ?? 0} students
                   </p>
                 </div>
-                <div className="flex gap-3 items-center">
-                  <button onClick={() => openEdit(s)} className="text-gray-400 hover:text-[#0f1419] p-2 hover:bg-gray-100 rounded">
+                <div className="flex gap-2 items-center">
+                  {/* VIEW BUTTON */}
+                  <button 
+                    onClick={() => handleViewSchool(s)} 
+                    className="text-gray-400 hover:text-blue-600 p-2 hover:bg-blue-50 rounded transition-colors"
+                    title="View School"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </button>
+                  {/* EDIT BUTTON */}
+                  <button 
+                    onClick={() => openEdit(s)} 
+                    className="text-gray-400 hover:text-[#0f1419] p-2 hover:bg-gray-100 rounded transition-colors"
+                    title="Edit School"
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path key="list-edit-p1" d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                       <path key="list-edit-p2" d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                     </svg>
                   </button>
-                  <button onClick={() => { setSelectedSchool(s); setShowDelete(true); }} className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded">
+                  {/* DELETE BUTTON */}
+                  <button 
+                    onClick={() => { setSelectedSchool(s); setShowDelete(true); }} 
+                    className="text-gray-400 hover:text-red-600 p-2 hover:bg-red-50 rounded transition-colors"
+                    title="Delete School"
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline key="list-del-poly" points="3 6 5 6 21 6"></polyline>
                       <path key="list-del-path" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                     </svg>
                   </button>
+                  {/* STATUS BADGE */}
+                  <span className={`ml-2 px-3 py-1 text-xs font-medium rounded-full ${
+                    s.isActive 
+                        ? "bg-[#d1fae5] text-[#065f46]" 
+                        : "bg-[#fef3c7] text-[#92400e]" 
+                  }`}>
+                    {s.isActive ? "active" : "inactive"}
+                  </span>
                 </div>
               </div>
             ))}
@@ -422,7 +496,7 @@ export default function SuperAdminDashboard() {
                 <div className="mb-3">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Admin Details</h3>
                     <p className="text-xs text-gray-500 mt-1">
-                        {editingSchool ? "Update admin information for this school" : "Enter admin credentials for the new school"}
+                        {editingSchool ? "Update admin information" : "A new admin account will be created with a temporary password"}
                     </p>
                 </div>
 
@@ -430,93 +504,78 @@ export default function SuperAdminDashboard() {
                 <div className="space-y-1">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Admin Name</label>
                     <input className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black"
-                    value={form.adminName} 
-                    onChange={e => setForm({ ...form, adminName: e.target.value })}
-                    placeholder="e.g. John Doe"
+                    value={form.adminName} onChange={e => setForm({ ...form, adminName: e.target.value })}
                     />
                 </div>
 
-                {/* Admin Email */}
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Admin Email</label>
-                    <input 
-                        type="email"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black"
-                        value={form.adminEmail} 
-                        onChange={e => setForm({ ...form, adminEmail: e.target.value })}
-                        placeholder="e.g. admin@school.com"
-                    />
-                </div>
-
-                {/* Admin Phone */}
-                <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Admin Phone</label>
-                    <input 
-                        type="tel"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black"
-                        value={form.adminPhone} 
-                        onChange={e => setForm({ ...form, adminPhone: e.target.value })}
-                        placeholder="e.g. +1 234 567 890"
-                    />
+                {/* Admin Email & Phone */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Admin Email</label>
+                        <input type="email" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black"
+                        value={form.adminEmail} onChange={e => setForm({ ...form, adminEmail: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Admin Phone</label>
+                        <input type="tel" className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black"
+                        value={form.adminPhone} onChange={e => setForm({ ...form, adminPhone: e.target.value })}
+                        />
+                    </div>
                 </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 mt-2 border-t border-gray-100">
-              <button onClick={closeModal} className="px-4 py-2 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
-              <button onClick={submitSchool} disabled={loading} className="bg-black text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm disabled:opacity-50">
-                {loading ? "Saving..." : (editingSchool ? "Save Changes" : "Create School")}
-              </button>
+            {/* Modal Footer */}
+            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+                <button onClick={closeModal} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium">
+                    Cancel
+                </button>
+                <button 
+                    onClick={submitSchool} 
+                    disabled={loading}
+                    className="px-6 py-2 bg-[#0f1419] hover:bg-black text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                    {loading ? "Saving..." : (editingSchool ? "Update" : "Create")}
+                </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* DELETE MODAL */}
-      {showDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
-            <h3 className="text-xl font-semibold mb-2 text-gray-900">Delete School?</h3>
-            <p className="text-sm text-gray-500 mb-6">
-                Are you sure you want to remove <span className="font-bold text-gray-900">{selectedSchool?.name}</span>? This action cannot be undone.
+      {/* DELETE CONFIRMATION MODAL */}
+      {showDelete && selectedSchool && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-600">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete School</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <span className="font-semibold">{selectedSchool.name}</span>? This action cannot be undone and will remove all associated data.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setShowDelete(false)} className="px-4 py-2 rounded-md text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium">Cancel</button>
-              <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 shadow-sm transition-colors">
-                Delete
+              <button 
+                onClick={() => setShowDelete(false)} 
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete} 
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Delete School
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* TOAST NOTIFICATIONS */}
-      <div className="fixed bottom-6 left-6 z-[60] flex flex-col gap-3 max-w-md">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`flex items-start gap-3 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-left duration-300 ${
-              toast.type === "success"
-                ? "bg-[#d1fae5] border-[#065f46] text-[#065f46]"
-                : toast.type === "error"
-                ? "bg-[#fee2e2] border-[#991b1b] text-[#991b1b]"
-                : "bg-[#dbeafe] border-[#1e40af] text-[#1e40af]"
-            }`}
-          >
-            <div className="flex-1 text-sm font-medium break-words">
-              {toast.message}
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="shrink-0 hover:opacity-70 transition-opacity"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

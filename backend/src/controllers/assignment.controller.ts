@@ -8,6 +8,8 @@ import { Role } from "@prisma/client";
  * Accepts the frontend format and creates/updates assignments
  * Works with SectionSubject model (subjects per section)
  * 
+ * FIXED: Now properly prevents duplicate tutor-subject assignments
+ * 
  * Request body:
  * {
  *   tutorId: string,
@@ -40,6 +42,7 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const createdAssignments: any[] = [];
+      const skippedAssignments: any[] = [];
       const errors: string[] = [];
 
       // 1. Process subject assignments
@@ -93,7 +96,7 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
               });
             }
 
-            // Check if assignment already exists
+            // ========== FIX: Check if assignment already exists (active or inactive) ==========
             const existingAssignment = await tx.tutorSubjectAssignment.findFirst({
               where: {
                 tutorId,
@@ -102,11 +105,33 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
             });
 
             if (existingAssignment) {
-              // Already assigned, skip
-              continue;
+              if (existingAssignment.isActive) {
+                // Already assigned and active - skip with message
+                skippedAssignments.push({
+                  grade: gradeName,
+                  section: sectionName,
+                  subject: subjectName,
+                  reason: "Already assigned",
+                });
+                continue;
+              } else {
+                // Exists but inactive - reactivate it
+                await tx.tutorSubjectAssignment.update({
+                  where: { id: existingAssignment.id },
+                  data: { isActive: true },
+                });
+                createdAssignments.push({
+                  id: existingAssignment.id,
+                  grade: gradeName,
+                  section: sectionName,
+                  subject: subjectName,
+                  reactivated: true,
+                });
+                continue;
+              }
             }
 
-            // Create assignment
+            // Create new assignment
             const assignment = await tx.tutorSubjectAssignment.create({
               data: {
                 tutorId,
@@ -138,16 +163,27 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
           });
 
           if (section) {
-            // Update section with class tutor
-            await tx.section.update({
-              where: { id: section.id },
-              data: { classTutorId: tutorId },
-            });
+            // Check if another tutor is already class tutor
+            if (section.classTutorId && section.classTutorId !== tutorId) {
+              const existingClassTutor = await tx.tutor.findUnique({
+                where: { id: section.classTutorId },
+                select: { name: true },
+              });
+              errors.push(
+                `Section ${classGrade}-${classSection} already has ${existingClassTutor?.name || 'another tutor'} as class tutor`
+              );
+            } else {
+              // Update section with class tutor
+              await tx.section.update({
+                where: { id: section.id },
+                data: { classTutorId: tutorId },
+              });
 
-            classTutorAssignment = {
-              grade: classGrade,
-              section: classSection,
-            };
+              classTutorAssignment = {
+                grade: classGrade,
+                section: classSection,
+              };
+            }
           } else {
             errors.push(`Section ${classSection} not found in ${classGrade} for class tutor assignment`);
           }
@@ -156,7 +192,7 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
         }
       }
 
-      return { createdAssignments, classTutorAssignment, errors };
+      return { createdAssignments, skippedAssignments, classTutorAssignment, errors };
     });
 
     // Audit log
@@ -167,9 +203,10 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
       actorEmail: req.user!.email,
       entity: "TutorAssignment",
       entityId: tutorId,
-      metadata:{
+      metadata: {
         tutorName: tutor.name,
         assignmentsCount: result.createdAssignments.length,
+        skippedCount: result.skippedAssignments.length,
         classTutor: result.classTutorAssignment,
       },
     });
@@ -179,11 +216,20 @@ export const smartAssignTutor: RequestHandler = async (req, res) => {
       tutorId,
       tutorName: tutor.name,
       subjectAssignments: result.createdAssignments,
+      skippedAssignments: result.skippedAssignments.length > 0 ? result.skippedAssignments : undefined,
       classTutorAssignment: result.classTutorAssignment,
       errors: result.errors.length > 0 ? result.errors : undefined,
     });
   } catch (error) {
     console.error("Smart assign tutor error:", error);
+    
+    // Handle unique constraint violation
+    if ((error as any).code === 'P2002') {
+      return res.status(409).json({ 
+        message: "This tutor is already assigned to one or more of these subjects" 
+      });
+    }
+    
     res.status(500).json({ message: "Failed to assign tutor" });
   }
 };
@@ -236,7 +282,10 @@ export const listAssignmentsGrouped: RequestHandler = async (req, res) => {
           if (!assignments[key]) {
             assignments[key] = [];
           }
-          assignments[key].push(assignment.sectionSubject.name);
+          // Prevent duplicate subject names in the same key
+          if (!assignments[key].includes(assignment.sectionSubject.name)) {
+            assignments[key].push(assignment.sectionSubject.name);
+          }
         });
 
         // Get class tutor info (first class section if any)
@@ -337,7 +386,7 @@ export const deleteAllTutorAssignments: RequestHandler = async (req, res) => {
       actorEmail: req.user!.email,
       entity: "TutorAssignment",
       entityId: tutorId,
-      metadata:{ tutorName: tutor.name },
+      metadata: { tutorName: tutor.name },
     });
 
     res.json({ message: "All assignments removed successfully" });
@@ -418,56 +467,119 @@ export const removeClassTutor: RequestHandler = async (req, res) => {
   }
 };
 
-/* ================= LIST ASSIGNMENTS FOR TUTOR ================= */
-export const listTutorAssignments: RequestHandler = async (req, res) => {
+/* ================= ASSIGN SUBJECT TO TUTOR ================= */
+/**
+ * Assigns a single subject to a tutor
+ * POST /api/v1/schools/:schoolId/assignments/subject
+ * 
+ * Body: { tutorId: string, sectionSubjectId: string }
+ */
+export const assignSubjectToTutor: RequestHandler = async (req, res) => {
   try {
-    const { tutorId } = req.params;
+    const { schoolId } = req.params;
+    const { tutorId, sectionSubjectId } = req.body;
 
-    const assignments = await prisma.tutorSubjectAssignment.findMany({
-      where: {
-        tutorId,
-        isActive: true,
-      },
+    if (!tutorId || !sectionSubjectId) {
+      return res.status(400).json({ message: "tutorId and sectionSubjectId are required" });
+    }
+
+    // Verify tutor exists and belongs to school
+    const tutor = await prisma.tutor.findFirst({
+      where: { id: tutorId, schoolId },
+    });
+
+    if (!tutor) {
+      return res.status(404).json({ message: "Tutor not found in this school" });
+    }
+
+    // Verify section subject exists
+    const sectionSubject = await prisma.sectionSubject.findUnique({
+      where: { id: sectionSubjectId },
       include: {
-        sectionSubject: {
-          include: {
-            section: {
-              include: {
-                grade: { select: { id: true, name: true } },
-              },
-            },
-          },
+        section: {
+          include: { grade: true },
         },
       },
-      orderBy: [
-        { sectionSubject: { section: { grade: { order: 'asc' } } } },
-        { sectionSubject: { section: { name: 'asc' } } },
-        { sectionSubject: { name: 'asc' } },
-      ],
     });
 
-    // Also get class sections
-    const classSections = await prisma.section.findMany({
+    if (!sectionSubject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    // ========== FIX: Check for existing assignment ==========
+    const existingAssignment = await prisma.tutorSubjectAssignment.findFirst({
       where: {
-        classTutorId: tutorId,
+        tutorId,
+        sectionSubjectId,
+      },
+    });
+
+    if (existingAssignment) {
+      if (existingAssignment.isActive) {
+        return res.status(409).json({ 
+          message: `${tutor.name} is already assigned to teach ${sectionSubject.name} in ${sectionSubject.section.grade.name}-${sectionSubject.section.name}` 
+        });
+      } else {
+        // Reactivate
+        const reactivated = await prisma.tutorSubjectAssignment.update({
+          where: { id: existingAssignment.id },
+          data: { isActive: true },
+        });
+        return res.status(200).json({
+          message: "Assignment reactivated",
+          assignment: reactivated,
+        });
+      }
+    }
+
+    const assignment = await prisma.tutorSubjectAssignment.create({
+      data: {
+        tutorId,
+        sectionSubjectId,
         isActive: true,
       },
-      include: {
-        grade: { select: { id: true, name: true } },
+    });
+
+    await logAudit({
+      action: "ASSIGN_SUBJECT_TO_TUTOR",
+      actorId: req.user!.userId,
+      actorRole: req.user!.role as Role,
+      actorEmail: req.user!.email,
+      entity: "TutorSubjectAssignment",
+      entityId: assignment.id,
+      metadata: {
+        tutorName: tutor.name,
+        subject: sectionSubject.name,
+        section: `${sectionSubject.section.grade.name}-${sectionSubject.section.name}`,
       },
     });
 
-    res.json({
-      subjectAssignments: assignments,
-      classSections,
+    res.status(201).json({
+      message: "Subject assigned to tutor successfully",
+      assignment: {
+        id: assignment.id,
+        tutorId,
+        tutorName: tutor.name,
+        subject: sectionSubject.name,
+        grade: sectionSubject.section.grade.name,
+        section: sectionSubject.section.name,
+      },
     });
   } catch (error) {
-    console.error("List tutor assignments error:", error);
-    res.status(500).json({ message: "Failed to fetch assignments" });
+    console.error("Assign subject to tutor error:", error);
+    
+    // Handle unique constraint violation
+    if ((error as any).code === 'P2002') {
+      return res.status(409).json({ 
+        message: "This tutor is already assigned to this subject" 
+      });
+    }
+    
+    res.status(500).json({ message: "Failed to assign subject" });
   }
 };
 
-/* ================= LIST ASSIGNMENTS FOR SECTION ================= */
+/* ================= LIST SECTION ASSIGNMENTS ================= */
 export const listSectionAssignments: RequestHandler = async (req, res) => {
   try {
     const { sectionId } = req.params;
@@ -524,5 +636,62 @@ export const removeAssignment: RequestHandler = async (req, res) => {
   } catch (error) {
     console.error("Remove assignment error:", error);
     res.status(500).json({ message: "Failed to remove assignment" });
+  }
+};
+
+/* ================= CHECK DUPLICATE ASSIGNMENT ================= */
+/**
+ * Utility endpoint to check if a tutor is already assigned to a subject
+ * GET /api/v1/schools/:schoolId/assignments/check-duplicate
+ * 
+ * Query: tutorId, sectionSubjectId
+ */
+export const checkDuplicateAssignment: RequestHandler = async (req, res) => {
+  try {
+    const { tutorId, sectionSubjectId } = req.query;
+
+    if (!tutorId || !sectionSubjectId) {
+      return res.status(400).json({ message: "tutorId and sectionSubjectId are required" });
+    }
+
+    const existingAssignment = await prisma.tutorSubjectAssignment.findFirst({
+      where: {
+        tutorId: tutorId as string,
+        sectionSubjectId: sectionSubjectId as string,
+        isActive: true,
+      },
+      include: {
+        tutor: { select: { name: true } },
+        sectionSubject: {
+          select: { 
+            name: true,
+            section: {
+              select: {
+                name: true,
+                grade: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (existingAssignment) {
+      return res.json({
+        isDuplicate: true,
+        message: `${existingAssignment.tutor.name} is already assigned to ${existingAssignment.sectionSubject.name} in ${existingAssignment.sectionSubject.section.grade.name}-${existingAssignment.sectionSubject.section.name}`,
+        existingAssignment: {
+          id: existingAssignment.id,
+          tutorName: existingAssignment.tutor.name,
+          subject: existingAssignment.sectionSubject.name,
+          section: `${existingAssignment.sectionSubject.section.grade.name}-${existingAssignment.sectionSubject.section.name}`,
+        },
+      });
+    }
+
+    res.json({ isDuplicate: false });
+  } catch (error) {
+    console.error("Check duplicate assignment error:", error);
+    res.status(500).json({ message: "Failed to check assignment" });
   }
 };

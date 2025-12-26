@@ -8,7 +8,9 @@ import {
   updateGrade,
   deleteGrade,
   addSection,
+  updateSection,
   deleteSection,
+  updateSectionSubjects,
   addSubjectToSection,
   deleteSubjectFromSection,
   getSchoolSubjects,
@@ -61,15 +63,16 @@ router.get(
 );
 
 /**
- * UPDATE GRADE (Comprehensive)
+ * UPDATE GRADE (Basic Info Only)
  * PUT /api/v1/schools/:schoolId/grades/:gradeId
+ * 
+ * Updates only grade's basic info (name, order, isActive)
+ * Use dedicated section/subject endpoints for those operations
  * 
  * Body: {
  *   name?: string,
  *   order?: number,
- *   isActive?: boolean,
- *   sections?: [{ id?: string, name: string, subjects?: string[] }],
- *   deleteSectionIds?: string[]
+ *   isActive?: boolean
  * }
  */
 router.put(
@@ -91,7 +94,7 @@ router.delete(
 /* ================= SECTIONS ================= */
 
 /**
- * ADD SECTION TO GRADE
+ * ADD SECTION TO GRADE (Append New Section)
  * POST /api/v1/schools/:schoolId/grades/:gradeId/sections
  * 
  * Body: { name: string, subjects?: string[] }
@@ -100,6 +103,18 @@ router.post(
   "/:gradeId/sections",
   requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
   addSection
+);
+
+/**
+ * UPDATE SECTION (Name only)
+ * PUT /api/v1/schools/:schoolId/grades/sections/:sectionId
+ * 
+ * Body: { name: string }
+ */
+router.put(
+  "/sections/:sectionId",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  updateSection
 );
 
 /**
@@ -115,7 +130,22 @@ router.delete(
 /* ================= SECTION SUBJECTS ================= */
 
 /**
- * ADD SUBJECT TO SECTION
+ * UPDATE SECTION SUBJECTS (Replace All)
+ * PUT /api/v1/schools/:schoolId/grades/sections/:sectionId/subjects
+ * 
+ * Replaces all subjects in a section with the provided list
+ * Body: { subjects: string[] }
+ * 
+ * Returns: { id, name, subjects, changes: { added, removed } }
+ */
+router.put(
+  "/sections/:sectionId/subjects",
+  requireRole("SUPERADMIN", "SCHOOL_ADMIN"),
+  updateSectionSubjects
+);
+
+/**
+ * ADD SUBJECT TO SECTION (Single Subject)
  * POST /api/v1/schools/:schoolId/grades/sections/:sectionId/subjects
  * 
  * Body: { name: string }
@@ -140,7 +170,7 @@ router.delete(
 
 /**
  * GET ALL UNIQUE SUBJECTS IN SCHOOL
- * GET /api/v1/schools/:schoolId/grades/subjects
+ * GET /api/v1/schools/:schoolId/grades/subjects/all
  * 
  * Returns all unique subject names used across all sections
  */
